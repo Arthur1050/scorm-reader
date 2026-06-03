@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="MANIFEST-2004"
+          version="1.3"
+          xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+          xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"
+          xmlns:imsss="http://www.imsglobal.org/xsd/imsss"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>2004 4th Edition</schemaversion>
+  </metadata>
+  <organizations default="ORG-2004">
+    <organization identifier="ORG-2004" structure="hierarchical">
+      <title>SCORM 2004 Example</title>
+      <item identifier="AGG-001">
+        <title>Module</title>
+        <item identifier="ITEM-2004" identifierref="RES-SCO">
+          <title>Launch SCO</title>
+        </item>
+      </item>
+    </organization>
+  </organizations>
+  <resources>
+    <resource identifier="RES-SCO" type="webcontent" adlcp:scormType="sco" xml:base="sco/" href="index.html">
+      <file href="index.html" />
+      <dependency identifierref="RES-ASSET" />
+    </resource>
+    <resource identifier="RES-ASSET" type="webcontent" adlcp:scormType="asset" xml:base="sco/">
+      <file href="style.css" />
+    </resource>
+  </resources>
+</manifest>

@@ -1,0 +1,29 @@
+{
+  "name": "arthur-dti/scorm-reader",
+  "description": "Backend PHP importer, parser, creator and exporter for SCORM 1.2 and SCORM 2004 packages.",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.1",
+    "ext-dom": "*",
+    "ext-libxml": "*",
+    "ext-simplexml": "*",
+    "ext-zlib": "*"
+  },
+  "suggest": {
+    "ext-zip": "Preferred ZIP backend. The library falls back to PharData when ZipArchive is unavailable."
+  },
+  "autoload": {
+    "psr-4": {
+      "ScormReader\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "ScormReader\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "php tests/run.php"
+  }
+}
