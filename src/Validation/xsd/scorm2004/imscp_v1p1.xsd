@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IMS Content Packaging Information Model - Version 1.1
+  Namespace: http://www.imsglobal.org/xsd/imscp_v1p1
+  Used by SCORM 2004 imsmanifest.xml
+
+  Simplified schema for structural validation.
+  Source: IMS Global Learning Consortium specification (public domain).
+-->
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"
+  targetNamespace="http://www.imsglobal.org/xsd/imscp_v1p1"
+  elementFormDefault="qualified"
+  attributeFormDefault="unqualified"
+>
+
+  <xs:import namespace="http://www.adlnet.org/xsd/adlcp_v1p3"
+             schemaLocation="adlcp_v1p3.xsd"/>
+
+  <!-- Root element -->
+  <xs:element name="manifest" type="manifestType"/>
+
+  <xs:complexType name="manifestType">
+    <xs:sequence>
+      <xs:element name="metadata" type="metadataType" minOccurs="0"/>
+      <xs:element name="organizations" type="organizationsType"/>
+      <xs:element name="resources" type="resourcesType"/>
+      <xs:element name="manifest" type="manifestType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="identifier" type="xs:string" use="required"/>
+    <xs:attribute name="version" type="xs:string"/>
+    <xs:anyAttribute namespace="##other" processContents="lax"/>
+  </xs:complexType>
+
+  <xs:complexType name="metadataType">
+    <xs:sequence>
+      <xs:element name="schema" type="xs:string" minOccurs="0"/>
+      <xs:element name="schemaversion" type="xs:string" minOccurs="0"/>
+      <xs:any namespace="##other" processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="organizationsType">
+    <xs:sequence>
+      <xs:element name="organization" type="organizationType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="default" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="organizationType">
+    <xs:sequence>
+      <xs:element name="title" type="xs:string" minOccurs="0"/>
+      <xs:element name="item" type="itemType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:any namespace="##other" processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="identifier" type="xs:string" use="required"/>
+    <xs:attribute name="structure" type="xs:string"/>
+    <xs:anyAttribute namespace="##other" processContents="lax"/>
+  </xs:complexType>
+
+  <xs:complexType name="itemType">
+    <xs:sequence>
+      <xs:element name="title" type="xs:string" minOccurs="0"/>
+      <xs:element name="item" type="itemType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:any namespace="##other" processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="identifier" type="xs:string" use="required"/>
+    <xs:attribute name="identifierref" type="xs:string"/>
+    <xs:attribute name="isvisible" type="xs:boolean"/>
+    <xs:attribute name="parameters" type="xs:string"/>
+    <xs:anyAttribute namespace="##other" processContents="lax"/>
+  </xs:complexType>
+
+  <xs:complexType name="resourcesType">
+    <xs:sequence>
+      <xs:element name="resource" type="resourceType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:anyAttribute namespace="##other" processContents="lax"/>
+  </xs:complexType>
+
+  <xs:complexType name="resourceType">
+    <xs:sequence>
+      <xs:element name="metadata" type="metadataType" minOccurs="0"/>
+      <xs:element name="file" type="fileType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="dependency" type="dependencyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="identifier" type="xs:string" use="required"/>
+    <xs:attribute name="type" type="xs:string"/>
+    <xs:attribute name="href" type="xs:string"/>
+    <xs:attribute ref="adlcp:scormType"/>
+    <xs:anyAttribute namespace="##other" processContents="lax"/>
+  </xs:complexType>
+
+  <xs:complexType name="fileType">
+    <xs:sequence>
+      <xs:element name="metadata" type="metadataType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="href" type="xs:string" use="required"/>
+    <xs:anyAttribute namespace="##other" processContents="lax"/>
+  </xs:complexType>
+
+  <xs:complexType name="dependencyType">
+    <xs:attribute name="identifierref" type="xs:string" use="required"/>
+    <xs:anyAttribute namespace="##other" processContents="lax"/>
+  </xs:complexType>
+
+</xs:schema>

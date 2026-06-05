@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="MANIFEST-DANGEROUS" version="1.0"
+  xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>1.2</schemaversion>
+  </metadata>
+  <organizations default="ORG-01">
+    <organization identifier="ORG-01">
+      <title>Dangerous Extension Test</title>
+      <item identifier="ITEM-01" identifierref="RES-01">
+        <title>Test SCO</title>
+      </item>
+    </organization>
+  </organizations>
+  <resources>
+    <resource identifier="RES-01" type="webcontent" adlcp:scormtype="sco" href="index.html">
+      <file href="index.html"/>
+      <file href="script.php"/>
+    </resource>
+  </resources>
+</manifest>

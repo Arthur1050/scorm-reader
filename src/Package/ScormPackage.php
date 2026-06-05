@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace ScormReader\Package;
 
 use JsonSerializable;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use ScormReader\Manifest\Item;
 use ScormReader\Manifest\Manifest;
 use ScormReader\Validation\ValidationResult;
 
 final class ScormPackage implements JsonSerializable
 {
+    private bool $cleaned = false;
+
     public function __construct(
         private readonly string $sourcePath,
         private readonly string $packageRoot,
@@ -57,6 +61,25 @@ final class ScormPackage implements JsonSerializable
     }
 
     /**
+     * Remove the temporary extraction directory, if any.
+     * Safe to call multiple times.
+     */
+    public function cleanUp(): void
+    {
+        if ($this->cleaned || $this->temporaryDirectory === null) {
+            return;
+        }
+
+        $this->cleaned = true;
+        $this->removeDirectory($this->temporaryDirectory);
+    }
+
+    public function __destruct()
+    {
+        $this->cleanUp();
+    }
+
+    /**
      * @return list<Item>
      */
     public function launchableItems(bool $defaultOrganizationOnly = true): array
@@ -89,5 +112,26 @@ final class ScormPackage implements JsonSerializable
     public function jsonSerialize(): array
     {
         return $this->toArray();
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        $root = realpath($directory);
+
+        if ($root === false || !is_dir($root)) {
+            return;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($iterator as $fileInfo) {
+            $path = $fileInfo->getPathname();
+            $fileInfo->isDir() ? @rmdir($path) : @unlink($path);
+        }
+
+        @rmdir($root);
     }
 }

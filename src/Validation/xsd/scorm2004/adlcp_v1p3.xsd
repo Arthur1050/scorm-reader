@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADL SCORM 2004 Content Packaging Extensions - Version 1.3
+  Namespace: http://www.adlnet.org/xsd/adlcp_v1p3
+  Used by SCORM 2004 imsmanifest.xml
+
+  Source: ADL (Advanced Distributed Learning) specification (public domain).
+-->
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  xmlns="http://www.adlnet.org/xsd/adlcp_v1p3"
+  targetNamespace="http://www.adlnet.org/xsd/adlcp_v1p3"
+  elementFormDefault="qualified"
+  attributeFormDefault="unqualified"
+>
+
+  <!-- scormType attribute on resource elements (case-sensitive in SCORM 2004) -->
+  <xs:attribute name="scormType">
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="sco"/>
+        <xs:enumeration value="asset"/>
+        <xs:enumeration value="SCO"/>
+        <xs:enumeration value="Asset"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+
+</xs:schema>

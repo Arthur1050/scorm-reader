@@ -47,7 +47,7 @@ final class ScormPackageExporter
         $this->copyDirectory($sourceDirectory, $destinationDirectory, $options->overwrite);
         $this->writeManifest($manifest, $destinationDirectory, $options->overwrite);
 
-        return $this->packageFromDirectory($destinationDirectory, $options);
+        return $this->packageFromDirectory($destinationDirectory, $options, $manifest);
     }
 
     public function exportManifestToZip(
@@ -70,7 +70,7 @@ final class ScormPackageExporter
 
             $this->exportDirectoryToZip($temporaryDirectory, $destinationZipPath, $options);
 
-            return $this->packageFromZip($destinationZipPath, $options, $workDirectory);
+            return $this->packageFromZip($destinationZipPath, $options, $workDirectory, $manifest);
         } finally {
             $this->removeDirectory($temporaryDirectory);
         }
@@ -89,9 +89,10 @@ final class ScormPackageExporter
             $file->writeTo($destinationDirectory, $options->overwrite);
         }
 
-        $this->writeManifest($creator->buildManifest(), $destinationDirectory, $options->overwrite);
+        $manifest = $creator->buildManifest();
+        $this->writeManifest($manifest, $destinationDirectory, $options->overwrite);
 
-        return $this->packageFromDirectory($destinationDirectory, $options);
+        return $this->packageFromDirectory($destinationDirectory, $options, $manifest);
     }
 
     public function exportCreatedPackageToZip(
@@ -110,9 +111,10 @@ final class ScormPackageExporter
                 options: new ExportOptions(overwrite: true, validateAfterExport: false, validationOptions: $options->validationOptions()),
             );
 
+            $manifest = $creator->buildManifest();
             $this->exportDirectoryToZip($temporaryDirectory, $destinationZipPath, $options);
 
-            return $this->packageFromZip($destinationZipPath, $options, $workDirectory);
+            return $this->packageFromZip($destinationZipPath, $options, $workDirectory, $manifest);
         } finally {
             $this->removeDirectory($temporaryDirectory);
         }
@@ -142,30 +144,34 @@ final class ScormPackageExporter
         }
     }
 
-    private function packageFromDirectory(string $directory, ExportOptions $options): ScormPackage
+    private function packageFromDirectory(string $directory, ExportOptions $options, ?Manifest $builtManifest = null): ScormPackage
     {
         if ($options->validateAfterExport) {
             return ($this->importer ?? new ScormPackageImporter())->import($directory, options: $options->validationOptions());
         }
 
+        $manifest = $builtManifest ?? ($this->importer ?? new ScormPackageImporter())->import($directory, options: $options->validationOptions())->manifest();
+
         return new ScormPackage(
             sourcePath: realpath($directory) ?: $directory,
             packageRoot: realpath($directory) ?: $directory,
-            manifest: ($this->importer ?? new ScormPackageImporter())->import($directory, options: $options->validationOptions())->manifest(),
+            manifest: $manifest,
             validationResult: new ValidationResult(),
         );
     }
 
-    private function packageFromZip(string $zipPath, ExportOptions $options, ?string $workDirectory): ScormPackage
+    private function packageFromZip(string $zipPath, ExportOptions $options, ?string $workDirectory, ?Manifest $builtManifest = null): ScormPackage
     {
         if ($options->validateAfterExport) {
             return ($this->importer ?? new ScormPackageImporter())->import($zipPath, $workDirectory, $options->validationOptions());
         }
 
+        $manifest = $builtManifest ?? ($this->importer ?? new ScormPackageImporter())->import($zipPath, $workDirectory, $options->validationOptions())->manifest();
+
         return new ScormPackage(
             sourcePath: realpath($zipPath) ?: $zipPath,
             packageRoot: realpath(dirname($zipPath)) ?: dirname($zipPath),
-            manifest: ($this->importer ?? new ScormPackageImporter())->import($zipPath, $workDirectory, $options->validationOptions())->manifest(),
+            manifest: $manifest,
             validationResult: new ValidationResult(),
             extracted: false,
         );

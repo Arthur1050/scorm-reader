@@ -16,16 +16,19 @@ Ja esta implementado:
 - resolucao de `item.identifierref` para `Resource`;
 - listagem de itens SCO lancaveis;
 - validacoes de pacote, manifesto, paths, limites, MIME e extensoes;
+- validacao estrutural opcional via XSD bundled (SCORM 1.2 e 2004);
 - criacao fluente de pacotes SCORM;
+- builders fluentes para `Item`, `Resource` e `Organization`;
+- suporte a multiplas `organizations` por pacote;
 - criacao de manifestos SCORM 1.2 e SCORM 2004;
 - exportacao para pasta;
 - exportacao para ZIP;
 - validacao automatica apos exportacao;
+- limpeza automatica de diretorios temporarios de extracao;
 - serializacao para array/JSON.
 
 Ainda nao esta implementado:
 
-- validacao completa por XSD oficial;
 - runtime SCORM, CMI, tracking, sequencing ou comunicacao LMS.
 
 ## Requisitos
@@ -97,6 +100,22 @@ $package = $importer->import('C:/materiais/curso-extraido');
 
 O `imsmanifest.xml` precisa estar diretamente na raiz do pacote.
 
+### Limpeza automatica do diretorio temporario
+
+Quando o pacote e importado de um ZIP, a lib extrai os arquivos em um diretorio temporario.
+Esse diretorio e removido automaticamente quando o objeto `ScormPackage` e destruido.
+
+Voce tambem pode chamar `cleanUp()` manualmente:
+
+```php
+$package = $importer->import('curso.zip');
+
+// ... usa o pacote ...
+
+$package->cleanUp(); // Remove o tempdir imediatamente.
+// Chamar novamente e seguro (idempotente).
+```
+
 ## Criar SCORM
 
 A forma mais simples de criar material SCORM e usar `ScormPackageCreator`.
@@ -164,43 +183,159 @@ $creator = ScormPackageCreator::scorm12('Curso')
     ->addFileFromPath(__DIR__ . '/assets/logo.png', 'assets/logo.png');
 ```
 
+### Multiplas organizations
+
+Use `addOrganization()` para incluir organizations adicionais alem da organization default.
+Combine com `OrganizationBuilder` para montar a arvore de navegacao:
+
+```php
+use ScormReader\Manifest\ItemBuilder;
+use ScormReader\Manifest\OrganizationBuilder;
+use ScormReader\Package\ScormPackageCreator;
+
+$creator = ScormPackageCreator::scorm12('Curso Completo')
+    ->addScoContent('Introducao', 'intro/index.html', $htmlIntro)
+    ->addOrganization(
+        OrganizationBuilder::create('ORG-MODULO-2', 'Modulo 2')
+            ->addItem(
+                ItemBuilder::create('ITEM-M2-A1', 'Aula 2.1')->withResource('RES-001')
+            )
+            ->addItem(
+                ItemBuilder::create('ITEM-M2-A2', 'Aula 2.2')->withResource('RES-002')
+            )
+    );
+
+$manifest = $creator->buildManifest();
+echo count($manifest->organizations()); // 2
+```
+
+A organization default continua sendo a primeira e e referenciada por `defaultOrganizationIdentifier`.
+
+## Builders Fluentes
+
+A biblioteca oferece builders fluentes para construir modelos de forma mais legivel.
+
+### ItemBuilder
+
+```php
+use ScormReader\Manifest\ItemBuilder;
+
+// Item simples
+$item = ItemBuilder::create('ITEM-001', 'Aula 1')
+    ->withResource('RES-001')
+    ->withParameters('?mode=browse')
+    ->build();
+
+// Hierarquia aninhada
+$modulo = ItemBuilder::create('ITEM-MOD', 'Modulo 1')
+    ->addChild(
+        ItemBuilder::create('ITEM-A', 'Aula A')->withResource('RES-A')
+    )
+    ->addChild(
+        ItemBuilder::create('ITEM-B', 'Aula B')->withResource('RES-B')->hidden()
+    )
+    ->build();
+```
+
+Metodos disponiveis:
+
+- `create($identifier, $title)` — factory estatico;
+- `withResource($identifierRef)` — associa um resource;
+- `withParameters($parameters)` — parametros de lancamento (ex: `'?mode=normal'`);
+- `hidden()` — define `isvisible="false"`;
+- `addChild(ItemBuilder $child)` — adiciona sub-item;
+- `build()` — constroi o `Item`.
+
+### ResourceBuilder
+
+```php
+use ScormReader\Manifest\ResourceBuilder;
+
+// SCO (o href e automaticamente incluido na lista de files)
+$sco = ResourceBuilder::sco('RES-AULA-1', 'aula-1/index.html')
+    ->withFile('aula-1/style.css')
+    ->withFile('aula-1/app.js')
+    ->withDependency('RES-SHARED')
+    ->build();
+
+// Asset compartilhado
+$asset = ResourceBuilder::asset('RES-SHARED')
+    ->withFile('shared/api.js')
+    ->withFile('shared/style.css')
+    ->build();
+
+// SCO com xml:base
+$sco = ResourceBuilder::sco('RES-002', 'index.html')
+    ->withXmlBase('modulo-2/')
+    ->build();
+// launchPath resolvido: 'modulo-2/index.html'
+```
+
+Metodos disponiveis:
+
+- `sco($identifier, $href)` — factory para SCO, inclui href na lista de files;
+- `asset($identifier)` — factory para asset;
+- `withType($type)` — substitui o atributo `type` (default: `'webcontent'`);
+- `withFile($href)` — declara arquivo no manifesto;
+- `withDependency($identifierRef)` — adiciona referencia de dependencia;
+- `withXmlBase($xmlBase)` — define `xml:base`; o `launchPath` e resolvido automaticamente;
+- `build()` — constroi o `Resource`.
+
+### OrganizationBuilder
+
+```php
+use ScormReader\Manifest\ItemBuilder;
+use ScormReader\Manifest\OrganizationBuilder;
+
+$org = OrganizationBuilder::create('ORG-01', 'Modulo Principal')
+    ->addItem(
+        ItemBuilder::create('ITEM-INTRO', 'Introducao')->withResource('RES-001')
+    )
+    ->addItem(
+        ItemBuilder::create('ITEM-SUBS', 'Sub-modulos')
+            ->addChild(ItemBuilder::create('ITEM-S1', 'Sub 1')->withResource('RES-S1'))
+            ->addChild(ItemBuilder::create('ITEM-S2', 'Sub 2')->withResource('RES-S2'))
+    )
+    ->asDefault()
+    ->build();
+```
+
+Metodos disponiveis:
+
+- `create($identifier, $title)` — factory estatico;
+- `addItem(ItemBuilder|Item $item)` — adiciona item de topo;
+- `withStructure($structure)` — define o atributo `structure` (default: `'hierarchical'`);
+- `asDefault()` — marca como organization default ao montar `Manifest` manualmente;
+- `build()` — constroi a `Organization`.
+
 ## Exportar Manifesto Avancado
 
 Para casos mais complexos, o dev pode montar os modelos diretamente e gerar o XML com `ManifestBuilder`:
 
 ```php
-use ScormReader\Manifest\Item;
 use ScormReader\Manifest\Manifest;
 use ScormReader\Manifest\ManifestBuilder;
-use ScormReader\Manifest\Organization;
-use ScormReader\Manifest\Resource;
+use ScormReader\Manifest\OrganizationBuilder;
+use ScormReader\Manifest\ItemBuilder;
+use ScormReader\Manifest\ResourceBuilder;
 use ScormReader\Version\ScormVersion;
 
-$resource = new Resource(
-    identifier: 'RES-AULA-1',
-    type: 'webcontent',
-    scormType: 'sco',
-    href: 'aula-1/index.html',
-    launchPath: 'aula-1/index.html',
-    files: ['aula-1/index.html', 'aula-1/style.css'],
-);
+$resource = ResourceBuilder::sco('RES-AULA-1', 'aula-1/index.html')
+    ->withFile('aula-1/style.css')
+    ->build();
 
-$item = new Item(
-    identifier: 'ITEM-AULA-1',
-    title: 'Aula 1',
-    identifierRef: 'RES-AULA-1',
-);
-$item->setResource($resource);
+$org = OrganizationBuilder::create('ORG-CURSO', 'Curso')
+    ->addItem(ItemBuilder::create('ITEM-AULA-1', 'Aula 1')->withResource('RES-AULA-1'))
+    ->asDefault()
+    ->build();
 
 $manifest = new Manifest(
     identifier: 'MANIFEST-CURSO',
     version: ScormVersion::SCORM_2004,
     rawSchemaVersion: '2004 4th Edition',
     title: 'Curso',
-    organizations: [
-        new Organization('ORG-CURSO', 'Curso', [$item], 'hierarchical', true),
-    ],
-    resources: [$resource],
+    organizations: [$org],
+    resources: [$resource->build()],
     defaultOrganizationIdentifier: 'ORG-CURSO',
 );
 
@@ -221,12 +356,14 @@ $package = (new ScormPackageExporter())->exportManifestToZip(
 
 ## Opcoes
 
+### ImportOptions
+
 `ImportOptions` controla validacoes usadas na importacao e tambem na validacao de pacotes criados:
 
 ```php
 use ScormReader\Package\ImportOptions;
 
-$validationOptions = new ImportOptions(
+$options = new ImportOptions(
     maxFileCount: 5000,
     maxTotalBytes: 500 * 1024 * 1024,
     maxFileBytes: 200 * 1024 * 1024,
@@ -234,8 +371,24 @@ $validationOptions = new ImportOptions(
     allowUnknownFileExtensions: false,
     validateMimeTypes: true,
     requireScoForLaunchableItems: true,
+    validateXsd: false,      // habilita validacao XSD (desligado por padrao)
+    xsdErrorsAsWarnings: true, // erros XSD viram warnings em vez de erros
 );
 ```
+
+| Campo | Padrao | Descricao |
+|---|---|---|
+| `maxFileCount` | `5000` | Limite de arquivos no pacote |
+| `maxTotalBytes` | `500 MB` | Tamanho total descomprimido |
+| `maxFileBytes` | `200 MB` | Tamanho maximo por arquivo |
+| `allowExternalResources` | `false` | Permite URLs externas em hrefs |
+| `allowUnknownFileExtensions` | `false` | Permite extensoes desconhecidas |
+| `validateMimeTypes` | `true` | Valida MIME type via `finfo` |
+| `requireScoForLaunchableItems` | `true` | Exige `scormType=sco` para item lancavel |
+| `validateXsd` | `false` | Ativa validacao XSD estrutural |
+| `xsdErrorsAsWarnings` | `true` | Trata erros XSD como warnings |
+
+### ExportOptions
 
 `ExportOptions` controla o comportamento da exportacao:
 
@@ -245,15 +398,54 @@ use ScormReader\Package\ExportOptions;
 $exportOptions = new ExportOptions(
     overwrite: true,
     validateAfterExport: true,
-    validationOptions: $validationOptions,
+    validationOptions: $options,
 );
 ```
 
-Campos:
+| Campo | Padrao | Descricao |
+|---|---|---|
+| `overwrite` | `false` | Permite sobrescrever destino existente |
+| `validateAfterExport` | `true` | Reimporta o pacote gerado para validar |
+| `validationOptions` | `ImportOptions()` | Regras usadas na validacao pos-exportacao |
 
-- `overwrite`: permite sobrescrever ZIP, pasta ou arquivos de destino;
-- `validateAfterExport`: importa o pacote exportado novamente e retorna um `ScormPackage` validado;
-- `validationOptions`: regras de validacao usadas antes/depois da exportacao.
+Quando `validateAfterExport = false`, o pacote retornado usa o manifesto ja construido em memoria, sem nenhuma reimportacao.
+
+## Validacao XSD (opcional)
+
+A biblioteca inclui schemas XSD bundled para validacao estrutural dos manifestos.
+A validacao e desativada por padrao para nao rejeitar pacotes comerciais com desvios menores.
+
+```php
+use ScormReader\Package\ImportOptions;
+use ScormReader\Package\ScormPackageImporter;
+
+// Ativando XSD como warnings (padrao ao habilitar)
+$package = (new ScormPackageImporter())->import(
+    'curso.zip',
+    options: new ImportOptions(validateXsd: true),
+);
+
+foreach ($package->validationResult()->warnings() as $warn) {
+    if (str_starts_with($warn->code(), 'XSD_')) {
+        echo $warn->message() . PHP_EOL;
+    }
+}
+
+// Ativando XSD como erros (rejeita pacotes com falhas estruturais)
+$package = (new ScormPackageImporter())->import(
+    'curso.zip',
+    options: new ImportOptions(validateXsd: true, xsdErrorsAsWarnings: false),
+);
+```
+
+Os schemas bundled cobrem:
+
+| Versao | Schema principal | Extensao ADL |
+|---|---|---|
+| SCORM 1.2 | `imscp_rootv1p1p2.xsd` | `adlcp_rootv1p2.xsd` |
+| SCORM 2004 | `imscp_v1p1.xsd` | `adlcp_v1p3.xsd` |
+
+Os imports entre schemas sao resolvidos localmente, sem nenhuma chamada de rede em runtime.
 
 ## Fluxo de Importacao
 
@@ -262,11 +454,12 @@ Campos:
 3. Valida limites, extensoes perigosas, nomes perigosos, paths absolutos, traversal e symlinks.
 4. Procura `imsmanifest.xml` na raiz.
 5. Faz parser do manifesto XML.
-6. Detecta a versao SCORM.
-7. Monta organizations, items e resources.
-8. Resolve `identifierref`, `href`, `xml:base`, `file` e `dependency`.
-9. Valida consistencia do manifesto e existencia dos arquivos.
-10. Retorna um `ScormPackage`.
+6. Se `validateXsd = true`, valida a estrutura contra o schema bundled.
+7. Detecta a versao SCORM.
+8. Monta organizations, items e resources.
+9. Resolve `identifierref`, `href`, `xml:base`, `file` e `dependency`.
+10. Valida consistencia do manifesto e existencia dos arquivos.
+11. Retorna um `ScormPackage`. O diretorio temporario e limpo automaticamente ao destruir o objeto.
 
 ## Fluxo de Criacao
 
@@ -274,8 +467,9 @@ Campos:
 2. A lib gera o `imsmanifest.xml` com `ManifestBuilder`.
 3. A lib escreve os arquivos do pacote na pasta de destino.
 4. Se solicitado, compacta a pasta em ZIP.
-5. A lib importa o pacote gerado novamente para validar o resultado.
-6. Retorna um `ScormPackage`.
+5. Se `validateAfterExport = true`, reimporta o pacote gerado para validar o resultado.
+6. Se `validateAfterExport = false`, usa o manifesto ja em memoria, sem I/O extra.
+7. Retorna um `ScormPackage`.
 
 ## Retorno
 
@@ -356,6 +550,7 @@ Metodos principais:
 - `addAsset($identifier, $files, $xmlBase = null)`;
 - `addItem(Item $item)`;
 - `addResource(Resource $resource)`;
+- `addOrganization(Organization|OrganizationBuilder $organization)`;
 - `addFileFromPath($sourcePath, $targetPath = null)`;
 - `addFileContent($targetPath, $contents)`;
 - `buildManifest()`;
@@ -417,8 +612,21 @@ Metodos principais:
 - `isValid()`;
 - `wasExtracted()`;
 - `temporaryDirectory()`;
+- `cleanUp()` — remove o diretorio temporario imediatamente;
 - `launchableItems()`;
 - `toArray()`.
+
+### ItemBuilder
+
+Builder fluente para `Item`. Ver secao [Builders Fluentes](#builders-fluentes).
+
+### ResourceBuilder
+
+Builder fluente para `Resource`. Ver secao [Builders Fluentes](#builders-fluentes).
+
+### OrganizationBuilder
+
+Builder fluente para `Organization`. Ver secao [Builders Fluentes](#builders-fluentes).
 
 ## Modelos
 
@@ -475,6 +683,7 @@ A biblioteca valida:
 - existencia do `imsmanifest.xml` na raiz;
 - versao SCORM suportada;
 - formato XML do manifesto;
+- estrutura XSD quando `validateXsd = true`;
 - `resource` com `scormType` valido;
 - SCO com `href`;
 - `href` apontando para arquivo existente dentro do pacote;
@@ -500,6 +709,10 @@ $validation = $package->validationResult();
 
 foreach ($validation->errors() as $error) {
     echo $error->code() . ': ' . $error->message() . PHP_EOL;
+}
+
+foreach ($validation->warnings() as $warning) {
+    echo '[warn] ' . $warning->code() . ': ' . $warning->message() . PHP_EOL;
 }
 ```
 
@@ -542,10 +755,18 @@ Os testes cobrem:
 - importacao SCORM 1.2;
 - importacao SCORM 2004 com `xml:base` e `dependency`;
 - manifesto invalido com path traversal;
+- extensao perigosa (`.php`) no manifesto;
+- `dependency` apontando para resource inexistente;
 - criacao de pacote SCORM 1.2 em pasta;
 - criacao de pacote SCORM 1.2 em ZIP;
 - criacao de pacote SCORM 2004;
-- round-trip de exportacao e importacao.
+- exportacao com `validateAfterExport = false`;
+- multiplas organizations via `addOrganization()`;
+- `ItemBuilder` com hierarquia e item hidden;
+- `ResourceBuilder` SCO e asset com files e dependencies;
+- `OrganizationBuilder` com items e `asDefault()`;
+- validacao XSD em pacote valido;
+- `cleanUp()` removendo diretorio temporario.
 
 Para validar sintaxe de todos os PHP no PowerShell:
 
@@ -559,13 +780,35 @@ Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 src/
 +-- Exception/
 +-- Manifest/
+|   +-- Item.php
+|   +-- ItemBuilder.php          (novo)
+|   +-- Manifest.php
+|   +-- ManifestBuilder.php
+|   +-- ManifestParser.php
+|   +-- Organization.php
+|   +-- OrganizationBuilder.php  (novo)
+|   +-- Resource.php
+|   `-- ResourceBuilder.php      (novo)
 +-- Package/
 +-- Security/
 +-- Validation/
+|   +-- xsd/
+|   |   +-- scorm12/             (schemas bundled para SCORM 1.2)
+|   |   `-- scorm2004/           (schemas bundled para SCORM 2004)
+|   +-- ManifestValidator.php
+|   +-- PackageValidator.php
+|   +-- ValidationIssue.php
+|   +-- ValidationResult.php
+|   `-- XsdValidator.php         (novo)
 `-- Version/
 
 tests/
 +-- fixtures/
+|   +-- bad-dependency/          (novo)
+|   +-- dangerous-ext/           (novo)
+|   +-- invalid-path/
+|   +-- scorm12/
+|   `-- scorm2004/
 +-- bootstrap.php
 `-- run.php
 ```
@@ -573,9 +816,9 @@ tests/
 Responsabilidades:
 
 - `Package`: importacao, criacao, exportacao, arquivos, opcoes e pacote resultante;
-- `Manifest`: parser, builder XML e modelos normalizados;
+- `Manifest`: parser, builder XML, modelos normalizados e builders fluentes;
 - `Version`: deteccao e enumeracao de versoes suportadas;
-- `Validation`: validadores, erros e avisos;
+- `Validation`: validadores, XSD, erros e avisos;
 - `Security`: regras de path seguro e extracao segura;
 - `Exception`: excecoes especificas da biblioteca.
 

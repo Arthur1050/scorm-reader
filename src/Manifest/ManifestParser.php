@@ -9,22 +9,27 @@ use DOMElement;
 use LibXMLError;
 use ScormReader\Exception\InvalidScormPackageException;
 use ScormReader\Exception\ManifestNotFoundException;
+use ScormReader\Package\ImportOptions;
 use ScormReader\Security\PathSecurity;
 use ScormReader\Validation\ValidationResult;
+use ScormReader\Validation\XsdValidator;
 use ScormReader\Version\VersionDetector;
 
 final class ManifestParser
 {
     private VersionDetector $versionDetector;
+    private XsdValidator $xsdValidator;
 
-    public function __construct(?VersionDetector $versionDetector = null)
+    public function __construct(?VersionDetector $versionDetector = null, ?XsdValidator $xsdValidator = null)
     {
         $this->versionDetector = $versionDetector ?? new VersionDetector();
+        $this->xsdValidator = $xsdValidator ?? new XsdValidator();
     }
 
-    public function parse(string $manifestPath, ?ValidationResult $validation = null): Manifest
+    public function parse(string $manifestPath, ?ValidationResult $validation = null, ?ImportOptions $options = null): Manifest
     {
         $validation ??= new ValidationResult();
+        $options ??= new ImportOptions();
 
         if (!is_file($manifestPath)) {
             throw new ManifestNotFoundException('imsmanifest.xml was not found at the package root.');
@@ -54,6 +59,11 @@ final class ManifestParser
         $rawSchemaVersion = $this->versionDetector->rawSchemaVersion($document);
         $identifier = trim($root->getAttribute('identifier'));
         $rootBase = $this->xmlBase($root);
+
+        // Optional XSD structural validation (requires ImportOptions::$validateXsd = true).
+        if ($options->validateXsd) {
+            $this->xsdValidator->validate($document, $version, $options, $validation, $manifestPath);
+        }
 
         $resourcesElement = $this->firstChildElement($root, 'resources');
         $resourcesBase = PathSecurity::joinUriPaths($rootBase, $this->xmlBase($resourcesElement));

@@ -61,7 +61,7 @@ final class ScormPackageImporter
             throw new ManifestNotFoundException('imsmanifest.xml was not found at the package root.', $validation);
         }
 
-        $manifest = ($this->manifestParser ?? new ManifestParser())->parse($manifestPath, $validation);
+        $manifest = ($this->manifestParser ?? new ManifestParser())->parse($manifestPath, $validation, $options);
         $manifestValidation = ($this->manifestValidator ?? new ManifestValidator())->validate($manifest, $packageRoot, $options);
         $validation->merge($manifestValidation);
 

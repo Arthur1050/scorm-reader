@@ -8,6 +8,7 @@ use ScormReader\Exception\InvalidScormPackageException;
 use ScormReader\Manifest\Item;
 use ScormReader\Manifest\Manifest;
 use ScormReader\Manifest\Organization;
+use ScormReader\Manifest\OrganizationBuilder;
 use ScormReader\Manifest\Resource;
 use ScormReader\Validation\ValidationResult;
 use ScormReader\Version\ScormVersion;
@@ -22,6 +23,9 @@ final class ScormPackageCreator
 
     /** @var array<string, PackageFile> */
     private array $files = [];
+
+    /** @var list<Organization> */
+    private array $extraOrganizations = [];
 
     private function __construct(
         private readonly string $title,
@@ -199,6 +203,31 @@ final class ScormPackageCreator
         return $this;
     }
 
+    /**
+     * Adds an extra organization to the package.
+     *
+     * The organization added here will appear in the manifest after the default
+     * organization. The default organization is always the one defined by the
+     * constructor title/identifier — it cannot be replaced via this method.
+     *
+     * Use {@see OrganizationBuilder} to compose complex trees:
+     *
+     * ```php
+     * $creator->addOrganization(
+     *     OrganizationBuilder::create('ORG-EXTRA', 'Módulo Extra')
+     *         ->addItem(ItemBuilder::create('ITEM-E1', 'Aula Extra')->withResource('RES-E1'))
+     * );
+     * ```
+     */
+    public function addOrganization(Organization|OrganizationBuilder $organization): self
+    {
+        $this->extraOrganizations[] = $organization instanceof OrganizationBuilder
+            ? $organization->build()
+            : $organization;
+
+        return $this;
+    }
+
     public function addFile(PackageFile $file): self
     {
         $this->files[$file->targetPath()] = $file;
@@ -229,7 +258,7 @@ final class ScormPackageCreator
             $this->resolveItemResource($item, $resourceMap);
         }
 
-        $organization = new Organization(
+        $defaultOrganization = new Organization(
             identifier: $this->organizationIdentifier,
             title: $this->title,
             items: $this->items,
@@ -237,12 +266,21 @@ final class ScormPackageCreator
             default: true,
         );
 
+        // Resolve resources for items in extra organizations.
+        foreach ($this->extraOrganizations as $extraOrg) {
+            foreach ($extraOrg->flattenItems() as $item) {
+                $this->resolveItemResource($item, $resourceMap);
+            }
+        }
+
+        $allOrganizations = array_merge([$defaultOrganization], $this->extraOrganizations);
+
         return new Manifest(
             identifier: $this->manifestIdentifier,
             version: $this->version,
             rawSchemaVersion: $this->version->is2004() ? '2004 4th Edition' : '1.2',
             title: $this->title,
-            organizations: [$organization],
+            organizations: $allOrganizations,
             resources: $resources,
             defaultOrganizationIdentifier: $this->organizationIdentifier,
         );

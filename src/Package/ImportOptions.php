@@ -36,6 +36,8 @@ final class ImportOptions
         public readonly bool $allowUnknownFileExtensions = false,
         public readonly bool $validateMimeTypes = true,
         public readonly bool $requireScoForLaunchableItems = true,
+        public readonly bool $validateXsd = false,
+        public readonly bool $xsdErrorsAsWarnings = true,
     ) {
         $this->allowedExtensions = $this->normalizeExtensions($allowedExtensions ?? self::defaultAllowedExtensions());
         $this->dangerousExtensions = $this->normalizeExtensions($dangerousExtensions ?? self::defaultDangerousExtensions());
